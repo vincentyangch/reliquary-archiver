@@ -8,7 +8,8 @@ made to be used with [fribbels hsr optimizer](https://github.com/fribbels/hsr-op
 
 ## run
 
-- If on Linux, or you know you want to use pcap (if you don't know what this means, you don't need to worry about it), follow the [pcap instructions](#pcap-instructions) at the bottom
+- On Apple Silicon macOS, follow the [macOS PlayCover capture guide](docs/macos-playcover.md)
+- On Linux, or on Windows when using pcap, follow the [pcap instructions](#pcap-instructions) at the bottom
 - Download latest release from [here](https://github.com/IceDynamix/reliquary-archiver/releases/)
 - **Launch the game and get to this screen. Do not go into the game yet**
   ![main menu start screen](./hsr_hyperdrive.jpg)
@@ -77,16 +78,17 @@ to output logs to a file, provide `--log-path <path>`. file logs will always be 
     - for me on windows, adding the `Packet.lib` and `wpcap.lib` from the sdk (check the x64 or arm dir)
       to this directory was enough to link successfully
 - If building on Linux, there is also a dependency on `libwayland-dev`
+- On Apple Silicon macOS, build the command-line pcap binary with `cargo build --release --no-default-features --features pcap,stream`; macOS supplies the system `libpcap` and BPF support.
 - `cargo build` / `cargo run`
 
 note that the necessary resource files are downloaded in the build script (`build.rs`) and compiled into the binary.
 
 ## pcap instructions
 
-When running with the `pcap` feature (optional on Windows, required on Linux),
+When running with the `pcap` feature (optional on Windows, required on Linux and the macOS command-line build),
 the following requirements apply:
 
-- requires [npcap](https://npcap.com/) (windows) or `libpcap` (linux)
+- requires [Npcap](https://npcap.com/) on Windows, `libpcap` development files on Linux, or the system `libpcap` and BPF access on macOS
     - when installing on windows, make sure to enable the "winpcap api-compatible mode".
       if this is grayed out for you, see [here](https://github.com/IceDynamix/reliquary-archiver/issues/2)
       for more details
