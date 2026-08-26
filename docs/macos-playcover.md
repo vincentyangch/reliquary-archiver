@@ -4,6 +4,10 @@ The supported macOS shape is an Apple Silicon command-line pcap build. There is 
 
 PlayCover game traffic uses the host macOS network stack. The existing UDP `23301-23302` capture filter is therefore the intended capture path. This is a practical capture workflow, not official upstream PlayCover support, and compatibility is not guaranteed across game or PlayCover versions.
 
+## Compatibility (checked 2026-08-26)
+
+This repository pins `reliquary v22.0.0`, which supports game version 4.4. Game version 4.5 traffic can be captured from PlayCover on macOS, but the current parser stops with `decryption key is missing for command` and produces no JSON. JSON export requires an upstream Reliquary update containing the 4.5 initial key, protobuf definitions, and packet definitions, followed by updating this repository's dependency. This is a game-version parser limitation, not a PlayCover or BPF capture failure; no update schedule is implied.
+
 ## Prerequisites
 
 - An Apple Silicon Mac.
@@ -37,13 +41,13 @@ Live capture requires access to macOS Berkeley Packet Filter (BPF) devices. Usin
 
 ## Offline capture
 
-Identify the active interface with:
+Identify the interface used by the default route with:
 
 ```sh
-networksetup -listallhardwareports
+route -n get default | awk '/interface:/{print $2}'
 ```
 
-Then capture the login traffic (replace `en1` with the interface you identified):
+Use the resulting interface (for example, `en1`) to capture the login traffic. If you need to map interface names to hardware ports, or the default-route command is unavailable, use `networksetup -listallhardwareports` as a mapping/fallback:
 
 ```sh
 sudo tcpdump -i en1 -n -s 0 -w hsr-login.pcap 'udp portrange 23301-23302'
@@ -61,6 +65,6 @@ Import the newest resulting `archive_output-*.json` file; older exports may alre
 
 - **`/dev/bpf` permission errors:** run the archiver command shown in **Capture PlayCover traffic** with `sudo`. Alternatively, configure Wireshark ChmodBPF as described above.
 - **No JSON output or capture does not start:** make sure the archiver is running while the game is still at **Click to Start**, then enter the game. If the game was already running, log out and repeat the sequence.
-- **Wrong interface:** use `networksetup -listallhardwareports` to identify the interface, and read the capture back with `tcpdump -nn -r hsr-login.pcap` to verify that it contains the expected traffic.
+- **Wrong interface:** identify the default-route interface with `route -n get default | awk '/interface:/{print $2}'`; use `networksetup -listallhardwareports` to map or cross-check it, and read the capture back with `tcpdump -nn -r hsr-login.pcap` to verify that it contains the expected traffic.
 - **Game-version changes:** the parser may need an update when the game protocol changes; a valid capture can still fail to produce an export until a parser update is available.
 - **VPNs and filtering:** VPNs, firewalls, or other network filtering can prevent the expected packets from appearing. First allowlist the game and capture traffic, or retry on another network path; if you temporarily disable filtering to test, re-enable it immediately afterward.
