@@ -10,6 +10,9 @@ made to be used with [fribbels hsr optimizer](https://github.com/fribbels/hsr-op
 
 - On Apple Silicon macOS, follow the [macOS PlayCover capture guide](docs/macos-playcover.md)
 - On Linux, or on Windows when using pcap, follow the [pcap instructions](#pcap-instructions) at the bottom
+
+The following release-download and GUI steps are for Windows GUI users:
+
 - Download latest release from [here](https://github.com/IceDynamix/reliquary-archiver/releases/)
 - **Launch the game and get to this screen. Do not go into the game yet**
   ![main menu start screen](./hsr_hyperdrive.jpg)
