@@ -52,3 +52,19 @@ jobs:
         with:
           name: reliquary-archiver-linux-pcap-x64
           path: target/debug/reliquary-archiver
+
+  build-macos-arm64:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: moonrepo/setup-rust@v1
+      - name: Test pcap CLI
+        run: cargo test --no-default-features --features pcap,stream
+      - name: Build release pcap CLI
+        run: cargo build --release --no-default-features --features pcap,stream
+      - name: Package executable
+        run: tar -czf target/release/reliquary-archiver-macos-arm64.tar.gz -C target/release reliquary-archiver
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reliquary-archiver-macos-arm64
+          path: target/release/reliquary-archiver-macos-arm64.tar.gz
