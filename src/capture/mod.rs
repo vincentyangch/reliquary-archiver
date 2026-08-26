@@ -209,6 +209,17 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_bpf_permission_denied_error_includes_recovery_hint() {
+        let error = capture_error("(cannot open BPF device) /dev/bpf0: Permission denied");
+
+        assert_eq!(
+            error.to_string(),
+            "(cannot open BPF device) /dev/bpf0: Permission denied. macOS packet capture requires BPF access; run reliquary-archiver with sudo or install Wireshark ChmodBPF"
+        );
+    }
+
     #[test]
     fn unrelated_capture_error_remains_unchanged() {
         let error = capture_error("adapter disconnected");
