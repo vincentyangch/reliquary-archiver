@@ -38,9 +38,30 @@ pub enum CaptureError {
     },
 }
 
+#[cfg(target_os = "macos")]
+const MACOS_BPF_PERMISSION_HINT: &str =
+    "macOS packet capture requires BPF access; run reliquary-archiver with sudo or install Wireshark ChmodBPF";
+
+#[cfg(target_os = "macos")]
+fn capture_error_hint(error: &(dyn Error + 'static)) -> Option<&'static str> {
+    let message = error.to_string().to_ascii_lowercase();
+    (message.contains("bpf") && (message.contains("operation not permitted") || message.contains("permission denied")))
+        .then_some(MACOS_BPF_PERMISSION_HINT)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn capture_error_hint(_error: &(dyn Error + 'static)) -> Option<&'static str> {
+    None
+}
+
 impl Display for CaptureError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.source().unwrap())
+        let source = self.source().unwrap();
+        write!(f, "{source}")?;
+        if let Some(hint) = capture_error_hint(source) {
+            write!(f, ". {hint}")?;
+        }
+        Ok(())
     }
 }
 
@@ -143,12 +164,12 @@ pub fn listen_on_all<B: CaptureBackend + 'static>(backend: B) -> Result<impl Str
                                                     merged_stream.insert(device_name, stream);
                                                 }
                                                 Err(e) => {
-                                                    tracing::warn!("Capture initialization error on new device {}: {:#?}", device_name, e);
+                                                    tracing::warn!(error = %e, device = %device_name, "Capture initialization error");
                                                 }
                                             }
                                         }
                                         Err(e) => {
-                                            tracing::warn!("Failed to create capture for new device {}: {:#?}", device_name, e);
+                                            tracing::warn!(error = %e, device = %device_name, "Failed to create capture");
                                         }
                                     }
                                 }
@@ -164,4 +185,34 @@ pub fn listen_on_all<B: CaptureBackend + 'static>(backend: B) -> Result<impl Str
     });
 
     Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn capture_error(message: &str) -> CaptureError {
+        CaptureError::CaptureError {
+            has_captured: false,
+            error: Box::new(std::io::Error::other(message)),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_bpf_permission_error_includes_recovery_hint() {
+        let error = capture_error("(cannot open BPF device) /dev/bpf0: Operation not permitted");
+
+        assert_eq!(
+            error.to_string(),
+            "(cannot open BPF device) /dev/bpf0: Operation not permitted. macOS packet capture requires BPF access; run reliquary-archiver with sudo or install Wireshark ChmodBPF"
+        );
+    }
+
+    #[test]
+    fn unrelated_capture_error_remains_unchanged() {
+        let error = capture_error("adapter disconnected");
+
+        assert_eq!(error.to_string(), "adapter disconnected");
+    }
 }
