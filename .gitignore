@@ -11,3 +11,6 @@ npcap-sdk*.zip
 *.bat
 *.vscode
 *.code-workspace
+/.gamedata-work
+*.pcap
+*.pcapng
