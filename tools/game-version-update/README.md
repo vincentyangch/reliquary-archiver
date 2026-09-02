@@ -7,7 +7,20 @@ When the game updates (4.4 -> 4.5 -> ...), this archiver stops working with:
 
 Nothing in *this* repo needs to change. Every version-specific value lives in the
 [`reliquary`](https://github.com/IceDynamix/reliquary) dependency pinned in
-`Cargo.toml`. These scripts rebuild that dependency from a new protocol dump.
+`Cargo.toml`. These scripts update that dependency and prove the result works.
+
+| script | what it does |
+|---|---|
+| `check-upstream.sh` | Is there an update, and what is the cheapest way to take it? Start here. |
+| `verify-bump.sh` | Did the new dependency actually change the game data? Run after updating. |
+| `capture-and-verify.sh` | Capture a login and prove the build reads it. The only conclusive check. |
+| `validate-export.py` | Does an export look sane, or misparsed? Called by the above; usable alone. |
+| `regen.sh` | Rebuild `reliquary` from a protocol dump. Only for the manual path. |
+| `validate-dump.py` | Check a dump before feeding it to codegen. Only for the manual path. |
+| `apply-key.py` | Insert an initial pad into the key table. Only for the manual path. |
+
+The first three are the whole routine when upstream is keeping up, which it
+normally is. The rest exist for when it is not.
 
 ---
 
@@ -88,20 +101,26 @@ Three things, all derived from the new client binary:
 | 2 | Command ids | `command_id.rs` | Commands unrecognised or misrouted |
 | 3 | Protobuf field numbers | `proto/*.rs` | Fields parse as garbage |
 
-All three change every patch. Measured across the 4.3 -> 4.4 bump, all nine
-commands this archiver reads moved:
+All three change every patch. Every one of the nine commands this archiver reads
+has moved on both bumps measured so far:
 
-| command | 4.3 | 4.4 |
-|---|---|---|
-| PlayerGetTokenScRsp | 13 | 81 |
-| PlayerLoginScRsp | 3 | 78 |
-| PlayerLoginFinishScRsp | 31 | 27 |
-| GetBagScRsp | 503 | 578 |
-| GetAvatarDataScRsp | 303 | 378 |
-| PlayerSyncScNotify | 673 | 625 |
-| SetAvatarEnhancedIdScRsp | 335 | 312 |
-| GetGachaInfoScRsp | 1903 | 1978 |
-| DoGachaScRsp | 1927 | 1958 |
+| command | 4.3 | 4.4 | 4.5 |
+|---|---|---|---|
+| PlayerGetTokenScRsp | 13 | 81 | 19 |
+| PlayerLoginScRsp | 3 | 78 | 13 |
+| PlayerLoginFinishScRsp | 31 | 27 | 36 |
+| GetBagScRsp | 503 | 578 | 513 |
+| GetAvatarDataScRsp | 303 | 378 | 313 |
+| PlayerSyncScNotify | 673 | 625 | 632 |
+| SetAvatarEnhancedIdScRsp | 335 | 312 | 326 |
+| GetGachaInfoScRsp | 1903 | 1978 | 1913 |
+| DoGachaScRsp | 1927 | 1958 | 1978 |
+
+Note that ids get *recycled*: `PlayerLoginScRsp` is 13 in 4.5, which was
+`PlayerGetTokenScRsp` in 4.3; `DoGachaScRsp` is 1978 in 4.5, which was
+`GetGachaInfoScRsp` in 4.4. A stale id therefore does not fail cleanly — it
+silently routes one command's bytes into another's parser. This is why the pad
+fingerprint, not the command table, is what identifies a version.
 
 Field numbers shuffle as well — in `Relic`, `unique_id` moved from wire tag 120
 to 8 across the same bump. **A key alone is not enough.**
@@ -114,15 +133,41 @@ characters and relic sets arrive without any code change.
 
 ## The happy path
 
-If upstream has already tagged a release for the new version, you do not need any
-of this. Check first:
+Almost always, someone else has already done the work. Check before doing
+anything else:
 
 ```sh
 ./tools/game-version-update/check-upstream.sh
 ```
 
-If it reports a new tag, just bump `tag = "v22.0.0"` in `Cargo.toml` and rebuild.
-That is the supported route and should always be preferred.
+It reports one of three verdicts:
+
+- **`merge-upstream`** — the upstream *archiver* has already bumped the
+  dependency. Merge it (`git merge upstream/main`) rather than editing
+  `Cargo.toml` by hand. A dependency bump upstream usually travels with fixes,
+  and hand-editing the tag silently skips them. On the 4.5 bump this was the
+  case, and merging picked up an offline-pcap fix that the verification step
+  below depends on.
+- **`new-tag`** — `reliquary` has tagged a new version but upstream has not
+  taken it yet. Bump the tag in `Cargo.toml` yourself and rebuild.
+- **`no-change`** — nothing to do.
+
+Then confirm the new dependency really is a new game version. A successful build
+proves only that the types still resolve; it says nothing about the game data:
+
+```sh
+./tools/game-version-update/verify-bump.sh
+```
+
+This compares the newly pinned tag against the previously pinned one (both
+recovered automatically) and checks the three things above: a pad was added, the
+command ids moved, and the protos were regenerated.
+
+Finally, prove it against real traffic — the only check that can:
+
+```sh
+./tools/game-version-update/capture-and-verify.sh
+```
 
 ## The manual path
 
@@ -184,8 +229,22 @@ bucketing scheme, not a shared source — it tracks a different client branch. I
 Structural validation cannot prove a dump matches your client. Only a capture can:
 
 ```sh
-./target/debug/reliquary-archiver --pcap <capture.pcap> -v out.json
+./tools/game-version-update/capture-and-verify.sh
 ```
 
+This detects the interface, prompts at the point in the login where the capture
+has to be running, hands the root-owned capture back to you, replays it, and
+validates the export. Use `--replay <file.pcap>` to re-check an existing capture.
+
 A capture taken while logging in is enough — success means the pad decrypted
-`PlayerGetTokenScRsp` and the ids and field numbers all lined up.
+`PlayerGetTokenScRsp` and the ids and field numbers all lined up. The timing is
+the part that catches people out: the login handshake goes past exactly once, so
+a capture started after entering the game contains nothing usable, and tcpdump
+will happily report a healthy packet count of unrelated traffic.
+
+Decryption succeeding is necessary but not sufficient. Stale protobuf field
+numbers still decrypt and still parse — into the wrong fields. `validate-export.py`
+(run automatically above, or standalone on any export) exists for that case, and
+distinguishes structural violations, which are always failures, from unfamiliar
+content such as a newly added path, which usually just means the checker is older
+than the game.
