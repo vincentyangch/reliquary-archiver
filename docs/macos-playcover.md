@@ -4,15 +4,17 @@ The supported macOS shape is an Apple Silicon command-line pcap build. There is 
 
 PlayCover game traffic uses the host macOS network stack. The existing UDP `23301-23302` capture filter is therefore the intended capture path. This is a practical capture workflow, not official upstream PlayCover support, and compatibility is not guaranteed across game or PlayCover versions.
 
-## Compatibility (checked 2026-08-26)
+## Compatibility (checked 2026-10-01)
 
-This repository pins `reliquary v22.0.0`, which supports game version 4.4. Game version 4.5 traffic can be captured from PlayCover on macOS, but the current parser stops with `decryption key is missing for command` and produces no JSON. JSON export requires an upstream Reliquary update containing the 4.5 initial key, protobuf definitions, and packet definitions, followed by updating this repository's dependency. This is a game-version parser limitation, not a PlayCover or BPF capture failure; no update schedule is implied.
+This repository includes upstream Archiver `v0.19.0` and pins `reliquary v24.0.0`, which [supports game version 4.6](https://github.com/IceDynamix/reliquary/blob/v24.0.0/README.md). The update contains a new initial decryption key, updated command IDs, and regenerated protobuf definitions. The previous 4.5 parser limitation has been superseded by upstream updates.
+
+Protocol checks confirm the version data changed, but a new login capture is still needed to verify JSON export from your current PlayCover client. An older capture tests its original game version only. Run `./tools/game-version-update/capture-and-verify.sh` from this worktree to capture and validate a fresh login, or use `--replay <file.pcap>` for an existing capture. Keep captures local because they contain session traffic.
 
 ## Prerequisites
 
 - An Apple Silicon Mac.
 - Xcode Command Line Tools. Install them with `xcode-select --install`.
-- Rust installed with [rustup](https://rustup.rs/).
+- Rust installed with [rustup](https://rustup.rs/). Reliquary v24 requires Rust 1.95 or newer; this repository selects Rust 1.98.1 through `rust-toolchain.toml`.
 - A working PlayCover installation and game.
 
 macOS already provides the system `libpcap` used by this build. Npcap is Windows-only and is not needed on macOS.
@@ -20,7 +22,7 @@ macOS already provides the system `libpcap` used by this build. Npcap is Windows
 Build the command-line capture binary with:
 
 ```sh
-cargo build --release --no-default-features --features pcap,stream
+cargo build --locked --release --no-default-features --features pcap,stream
 ```
 
 The binary is `target/release/reliquary-archiver`.
