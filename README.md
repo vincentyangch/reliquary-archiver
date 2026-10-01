@@ -79,6 +79,7 @@ to output logs to a file, provide `--log-path <path>`. file logs will always be 
 
 ## build from source
 
+- Reliquary v24 requires Rust 1.95 or newer. With [rustup](https://rustup.rs/) installed, this repository's `rust-toolchain.toml` selects Rust 1.98.1 without changing your global default toolchain.
 - If building on Linux, or Windows with pcap, follow instructions [here](https://github.com/rust-pcap/pcap?tab=readme-ov-file#building)
     - for me on windows, adding the `Packet.lib` and `wpcap.lib` from the sdk (check the x64 or arm dir)
       to this directory was enough to link successfully
