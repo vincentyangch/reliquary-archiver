@@ -9,7 +9,7 @@
 #
 # Steps: fetch reliquary + reliquary-codegen -> validate the dump -> regenerate
 # protos and command ids -> insert the initial decryption key -> point Cargo.toml
-# at the local checkout -> build.
+# at the local checkout -> re-lock Cargo.lock onto it -> build.
 #
 # Use --revert to unpin and go back to the upstream tag.
 
@@ -54,6 +54,16 @@ if [ "$REVERT" = 1 ]; then
   unpin
   echo "reverted -- Cargo.toml now uses the upstream reliquary tag again"
   exit 0
+fi
+
+# The marker also delimits other reliquary overrides, such as a pin to an
+# upstream pull request. Leaving a different one in place would build *that*
+# rather than the checkout regenerated below, and still report success.
+LOCAL_PATCH='reliquary = { path = ".gamedata-work/reliquary" }'
+if grep -q "$MARKER" "$REPO_ROOT/Cargo.toml" && ! grep -qF "$LOCAL_PATCH" "$REPO_ROOT/Cargo.toml"; then
+  echo "ERROR: Cargo.toml already carries a different reliquary override." >&2
+  echo "       Remove it first: ./tools/game-version-update/regen.sh --revert" >&2
+  exit 1
 fi
 
 mkdir -p "$WORK"
@@ -116,14 +126,28 @@ $MARKER
 # [build-dependencies]) with the locally regenerated checkout.
 # Remove with: ./tools/game-version-update/regen.sh --revert
 [patch."$RELIQUARY_URL"]
-reliquary = { path = ".gamedata-work/reliquary" }
+$LOCAL_PATCH
 # <<< game-version-update patch
 PATCH
 else
   echo "==> Cargo.toml already pinned to the local checkout"
 fi
 
-# --- 5. build ---------------------------------------------------------------
+# --- 5. make Cargo.lock follow the override ---------------------------------
+# A [patch] entry does not move the lockfile by itself. When the checkout has a
+# different version from the one already locked -- every new game version does,
+# reliquary bumps its major -- cargo keeps the locked git tag, warns that the
+# patch "was not used in the crate graph", and builds the *old* dependency
+# successfully. Re-resolve reliquary, then confirm the patch was taken.
+echo "==> re-locking reliquary onto the local checkout"
+( cd "$REPO_ROOT" && cargo update --quiet reliquary )
+if grep -q '^\[\[patch\.unused\]\]' "$REPO_ROOT/Cargo.lock"; then
+  echo "ERROR: cargo did not apply the override ([[patch.unused]] in Cargo.lock)." >&2
+  echo "       A build now would silently use the old reliquary." >&2
+  exit 1
+fi
+
+# --- 6. build ---------------------------------------------------------------
 if [ "$BUILD" = 1 ]; then
   echo "==> building"
   ( cd "$REPO_ROOT" && cargo build )
