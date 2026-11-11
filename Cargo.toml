@@ -84,3 +84,18 @@ pktmon = [
     "windows/Win32_UI_WindowsAndMessaging",
     "windows/Win32_System_Registry",
 ]
+
+# >>> game-version-update patch
+# Game 4.7, ahead of upstream: the reliquary update is still an open pull request
+# (https://github.com/IceDynamix/reliquary/pull/27), so take it from the author's
+# fork, pinned to the reviewed commit rather than to the branch. Overrides the
+# reliquary dependency in both [dependencies] and [build-dependencies].
+#
+# A [patch] only takes effect once Cargo.lock follows it: `cargo update reliquary`.
+#
+# Remove once upstream ships v25.0.0, then take the update the normal way
+# (check-upstream.sh):
+#     ./tools/game-version-update/regen.sh --revert
+[patch."https://github.com/IceDynamix/reliquary"]
+reliquary = { git = "https://github.com/FI00ds/reliquary", rev = "40c868ebf9b847f7ea9928be7905893c91f06531" }
+# <<< game-version-update patch
