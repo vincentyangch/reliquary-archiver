@@ -4,11 +4,23 @@ The supported macOS shape is an Apple Silicon command-line pcap build. There is 
 
 PlayCover game traffic uses the host macOS network stack. The existing UDP `23301-23302` capture filter is therefore the intended capture path. This is a practical capture workflow, not official upstream PlayCover support, and compatibility is not guaranteed across game or PlayCover versions.
 
-## Compatibility (checked 2026-10-01)
+## Compatibility (checked 2026-11-11)
 
-This repository includes upstream Archiver `v0.19.0` and pins `reliquary v24.0.0`, which [supports game version 4.6](https://github.com/IceDynamix/reliquary/blob/v24.0.0/README.md). The update contains a new initial decryption key, updated command IDs, and regenerated protobuf definitions. The previous 4.5 parser limitation has been superseded by upstream updates.
+Game version 4.7 works ahead of upstream. This repository includes upstream Archiver `v0.19.0`, whose dependency lines in `Cargo.toml` name `reliquary v24.0.0` for [game version 4.6](https://github.com/IceDynamix/reliquary/blob/v24.0.0/README.md). A `[patch]` section at the end of that file overrides it with `reliquary 25.0.0` from the open upstream pull request [Update protos for version 4.7](https://github.com/IceDynamix/reliquary/pull/27), pinned to commit `40c868e`, the first commit of that pull request, in the pull request author's fork. That commit contains the 4.7 initial decryption key, command IDs, and regenerated protobuf definitions. Commits added to the pull request since then are not included: as of this check they only add or rename definitions for affinitive eidolons and relic recon, which Archiver `v0.19.0` does not read.
 
-Protocol checks confirm the version data changed, but a new login capture is still needed to verify JSON export from your current PlayCover client. An older capture tests its original game version only. Run `./tools/game-version-update/capture-and-verify.sh` from this worktree to capture and validate a fresh login, or use `--replay <file.pcap>` for an existing capture. Keep captures local because they contain session traffic.
+The override was checked with a 4.7 login captured from PlayCover: `./tools/game-version-update/capture-and-verify.sh` passed, and this branch's release build produces the same export when it replays that capture.
+
+Known limitations: Archiver `v0.19.0` predates 4.7. Compared with the open upstream pull request [update reliquary to v25](https://github.com/IceDynamix/reliquary-archiver/pull/191), which is not included here, its export lacks:
+
+- the Elation debt trace (skill-tree point anchor `23`). The archiver logs `unknown point anchor` and skips that point; the rest of the character is exported.
+- affinitive eidolons.
+- relic recon relics, both in the export file and as live events under `--stream`.
+
+Only the first of these shows up in the log; the other two are skipped without a warning.
+
+The override is temporary. Once upstream releases `reliquary v25.0.0`, drop it (`./tools/game-version-update/regen.sh --revert`, then `cargo update reliquary` so that `Cargo.lock` follows) and take the update from upstream.
+
+The login check above covers only the client it was run on. To verify JSON export from your own PlayCover client, run `./tools/game-version-update/capture-and-verify.sh` from this worktree to capture and validate a fresh login, or use `--replay <file.pcap>` for an existing capture. An older capture tests its original game version only. Keep captures local because they contain session traffic.
 
 ## Prerequisites
 

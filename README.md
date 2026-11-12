@@ -11,7 +11,7 @@ made to be used with [fribbels hsr optimizer](https://github.com/fribbels/hsr-op
 - On Apple Silicon macOS, follow the [macOS PlayCover capture guide](docs/macos-playcover.md)
 - On Linux, or on Windows when using pcap, follow the [pcap instructions](#pcap-instructions) at the bottom
 
-**macOS compatibility (2026-10-01):** this repository pins Reliquary v24.0.0 for game version 4.6. The protocol update has been checked; see the [macOS PlayCover guide](docs/macos-playcover.md) for capture instructions and validation limits.
+**macOS compatibility (2026-11-11):** game version 4.7 works ahead of upstream. This repository still names Reliquary v24.0.0 (game version 4.6) and overrides it with the pending upstream 4.7 update, which has been checked against a live 4.7 login; see the [macOS PlayCover guide](docs/macos-playcover.md) for capture instructions, validation limits, and what the 4.7 export still lacks.
 
 The following release-download and GUI steps are for Windows GUI users:
 
